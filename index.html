@@ -16303,8 +16303,11 @@ ${de ? `<div class="campo"><b>De:</b> ${mEsc(de)}</div>` : ''}
             // Font size
             if (c.fontSize) { document.documentElement.style.fontSize = c.fontSize + 'px'; }
             // Require login on every open
-            // Seed admin user — runs immediately and again after Firebase loads
-            function seedAdminIfEmpty() {
+            // Seed admin SOLO la primera vez (usa una clave en Firebase/localStorage para no repetir)
+            const SEED_DONE_KEY = 'restpro_admin_seed_done_v1';
+            function seedAdminOnce() {
+                const alreadySeeded = localStorage.getItem(SEED_DONE_KEY) === '1';
+                if (alreadySeeded) return;
                 const users = cfgLoadUsers();
                 if (users.length === 0) {
                     const master = {
@@ -16314,13 +16317,15 @@ ${de ? `<div class="campo"><b>De:</b> ${mEsc(de)}</div>` : ''}
                     };
                     cfgSaveUsers([master]);
                 }
+                // Marcar como hecho — no volver a ejecutar nunca más
+                localStorage.setItem(SEED_DONE_KEY, '1');
             }
-            seedAdminIfEmpty();
-            // Also seed after Firebase finishes loading (in case Firestore was empty)
+            seedAdminOnce();
+            // También correr después de que Firebase cargue (por si llegó tarde)
             const _origFbReady = window._wgFirebaseReady;
             window._wgFirebaseReady = function() {
                 if (typeof _origFbReady === 'function') _origFbReady();
-                setTimeout(seedAdminIfEmpty, 500);
+                setTimeout(seedAdminOnce, 500);
             };
             cfgCurrentUser = null;
             document.body.classList.add('app-locked');
