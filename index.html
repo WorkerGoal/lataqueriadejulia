@@ -4335,133 +4335,177 @@
     </style>
     <!-- PDF.js loads on demand -->
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         FIREBASE REAL-TIME — WorkerGoal Multi-user
-         Lee y escribe DIRECTO a Firestore. onSnapshot para tiempo real.
-         ═════════════════════════════════════════════════════════════ -->
-
-    <!-- Pantalla de carga mientras Firebase conecta -->
+    <!-- ═══════════════════════════════════════════════════════
+         FIREBASE REAL-TIME SYNC — WorkerGoal
+         Estrategia: bloquear cfgBoot hasta que Firebase cargue
+         ═══════════════════════════════════════════════════════ -->
     <style>
-      #fb-overlay{position:fixed;inset:0;z-index:99999;background:#0a0e14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity .5s}
-      #fb-overlay .sp{width:48px;height:48px;border:4px solid #1e2d3d;border-top-color:#f97316;border-radius:50%;animation:sp .8s linear infinite}
-      @keyframes sp{to{transform:rotate(360deg)}}
+      #fb-overlay{position:fixed;inset:0;z-index:99999;background:#0a0e14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+      #fb-overlay .sp{width:48px;height:48px;border:4px solid #1e2d3d;border-top-color:#f97316;border-radius:50%;animation:fbsp .8s linear infinite}
+      @keyframes fbsp{to{transform:rotate(360deg)}}
       #fb-overlay .tt{font-family:sans-serif;font-size:28px;color:#f97316;letter-spacing:2px;font-weight:900}
-      #fb-overlay .msg{font-family:sans-serif;color:#64748b;font-size:13px;text-align:center}
+      #fb-overlay .ms{font-family:sans-serif;color:#64748b;font-size:13px;text-align:center}
     </style>
     <div id="fb-overlay">
-      <div class="tt">WORKERGOAL</div>
-      <div class="sp"></div>
-      <div class="msg">Conectando con Firebase…</div>
+      <div class="tt">WORKERGOAL</div><div class="sp"></div>
+      <div class="ms">Conectando con la base de datos…</div>
     </div>
 
+    <script>
+      // ── PASO 1: Crear almacén en memoria que reemplaza localStorage ──
+      // Este script corre SÍNCRONAMENTE antes que cualquier otro.
+      // La app entera leerá y escribirá aquí. Firebase sincroniza en paralelo.
+      (function() {
+        var _mem = {};   // cache en memoria
+
+        var _api = {
+          getItem:    function(k)    { return (_mem[k] !== undefined) ? _mem[k] : null; },
+          setItem:    function(k, v) {
+            _mem[k] = String(v);
+            // Escribir a Firebase si ya está listo
+            if (window._fbWrite) window._fbWrite(k, String(v));
+            else if (window._fbQueue) window._fbQueue.push({op:'set', k:k, v:String(v)});
+          },
+          removeItem: function(k)    {
+            delete _mem[k];
+            if (window._fbDelete) window._fbDelete(k);
+            else if (window._fbQueue) window._fbQueue.push({op:'del', k:k});
+          },
+          get length() { return Object.keys(_mem).length; },
+          key: function(i) { return Object.keys(_mem)[i] || null; },
+          clear: function() { Object.keys(_mem).forEach(function(k){ _api.removeItem(k); }); },
+          // Acceso interno para Firebase al precargar datos
+          _set: function(k, v) { _mem[k] = v; }
+        };
+
+        window._fbQueue = [];
+        window._fbWrite = null;
+        window._fbDelete = null;
+        window._memStore = _api;
+
+        // Reemplazar localStorage con nuestro almacén
+        try {
+          Object.defineProperty(window, 'localStorage', {
+            get: function() { return window._memStore; },
+            configurable: true
+          });
+          console.log('[WG] Almacén en memoria activo ✅');
+        } catch(e) {
+          // Parchear Storage.prototype como fallback
+          var _os = Storage.prototype.setItem;
+          var _og = Storage.prototype.getItem;
+          var _od = Storage.prototype.removeItem;
+          Storage.prototype.setItem    = function(k,v){ _api.setItem(k,v); };
+          Storage.prototype.getItem    = function(k)  { return _api.getItem(k); };
+          Storage.prototype.removeItem = function(k)  { _api.removeItem(k); };
+          console.log('[WG] Storage.prototype parcheado ✅');
+        }
+      })();
+
+      // ── PASO 2: Bloquear cfgBoot hasta que Firebase cargue ──
+      // cfgBoot() llama a cfgLoad() y cfgLoadUsers() que leen localStorage.
+      // Si corre antes de que Firebase llene el cache, leerá vacío.
+      // Solución: guardamos el cfgBoot original y lo corremos DESPUÉS.
+      window._cfgBootPending = true;  // señal para que cfgBoot espere
+    </script>
+
+    <!-- Firebase SDK (módulo async — carga en paralelo) -->
     <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-      import { getFirestore, doc, setDoc, deleteDoc, getDoc, collection, getDocs, onSnapshot }
+      import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-      const firebaseConfig = {
-        apiKey: "AIzaSyAO4QPSHWbgqvN3Dlu7FkRnE_iYV8ejgQQ",
-        authDomain: "workergoal-cd580.firebaseapp.com",
-        projectId: "workergoal-cd580",
-        storageBucket: "workergoal-cd580.firebasestorage.app",
+      const cfg = {
+        apiKey:            "AIzaSyAO4QPSHWbgqvN3Dlu7FkRnE_iYV8ejgQQ",
+        authDomain:        "workergoal-cd580.firebaseapp.com",
+        projectId:         "workergoal-cd580",
+        storageBucket:     "workergoal-cd580.firebasestorage.app",
         messagingSenderId: "646925301456",
-        appId: "1:646925301456:web:7ee8682a679fe92c7850d5"
+        appId:             "1:646925301456:web:7ee8682a679fe92c7850d5"
       };
 
-      const app = initializeApp(firebaseConfig);
+      const app = initializeApp(cfg);
       const db  = getFirestore(app);
       const COL = "workergoal_data";
 
-      // ── Cache local — la app lee de aquí síncronamente ──────────
-      const cache = {};
-
-      // ── API global que reemplaza localStorage ───────────────────
-      window._LS = {
-        getItem(k)    { return cache[k] ?? null; },
-        setItem(k, v) {
-          cache[k] = v;
-          setDoc(doc(db, COL, k), { v, updatedAt: Date.now() })
-            .catch(e => console.warn('[FB] write:', k, e.message));
-        },
-        removeItem(k) {
-          delete cache[k];
-          deleteDoc(doc(db, COL, k))
-            .catch(e => console.warn('[FB] delete:', k, e.message));
-        },
-        get length() { return Object.keys(cache).length; },
-        key(i)       { return Object.keys(cache)[i] ?? null; },
-        clear()      { Object.keys(cache).forEach(k => window._LS.removeItem(k)); }
+      // Exponer funciones de escritura al almacén síncrono
+      window._fbWrite  = function(k, v) {
+        setDoc(doc(db, COL, k), { v: v, t: Date.now() })
+          .catch(function(e){ console.warn('[FB] write:', k, e.message); });
+      };
+      window._fbDelete = function(k) {
+        deleteDoc(doc(db, COL, k))
+          .catch(function(e){ console.warn('[FB] delete:', k, e.message); });
       };
 
-      // ── Reemplazar localStorage globalmente ──────────────────────
-      // Usamos Object.defineProperty para interceptar ANTES que cualquier script
-      try {
-        Object.defineProperty(window, 'localStorage', {
-          get() { return window._LS; },
-          configurable: true
-        });
-      } catch(e) {
-        // Fallback: parchear Storage.prototype
-        const _origGet = Storage.prototype.getItem;
-        const _origSet = Storage.prototype.setItem;
-        const _origDel = Storage.prototype.removeItem;
-        Storage.prototype.getItem    = function(k)    { return window._LS.getItem(k); };
-        Storage.prototype.setItem    = function(k, v) { window._LS.setItem(k, v); };
-        Storage.prototype.removeItem = function(k)    { window._LS.removeItem(k); };
-      }
-
-      // ── 1. Carga inicial — bajar TODOS los datos de Firebase ────
+      // ── Carga inicial: bajar todos los datos a la cache ──
       try {
         const snap = await getDocs(collection(db, COL));
-        snap.forEach(d => { cache[d.id] = d.data().v ?? null; });
-        console.log('[Firebase] Carga inicial:', snap.size, 'claves ✅');
+        snap.forEach(function(d) {
+          var v = d.data().v;
+          if (v !== undefined && v !== null) window._memStore._set(d.id, v);
+        });
+        console.log('[Firebase] Carga inicial:', snap.size, 'documentos ✅');
       } catch(e) {
-        console.warn('[Firebase] Sin conexión — app en modo local:', e.message);
+        console.warn('[Firebase] Sin conexión — modo local:', e.message);
       }
 
-      // ── 2. Listener en tiempo real — actualiza cache al instante ─
-      // Cuando otro usuario guarda algo, esta función recibe el cambio
-      // y actualiza el cache + refresca la vista activa de la app
-      onSnapshot(collection(db, COL), (snap) => {
-        snap.docChanges().forEach(change => {
-          const key = change.doc.id;
-          if (change.type === 'removed') {
-            delete cache[key];
+      // ── Vaciar cola de escrituras que se acumularon durante la carga ──
+      (window._fbQueue || []).forEach(function(item) {
+        if (item.op === 'set') window._fbWrite(item.k, item.v);
+        else window._fbDelete(item.k);
+      });
+      window._fbQueue = [];
+
+      // ── Listener tiempo real: cuando otro usuario cambia algo ──
+      onSnapshot(collection(db, COL), function(snap) {
+        var changed = false;
+        snap.docChanges().forEach(function(ch) {
+          if (ch.type === 'removed') {
+            window._memStore._set(ch.doc.id, null);
           } else {
-            cache[key] = change.doc.data().v ?? null;
+            var v = ch.doc.data().v;
+            if (v !== undefined) {
+              window._memStore._set(ch.doc.id, v);
+              changed = true;
+            }
           }
         });
-        // Refrescar la página activa si la app ya arrancó
-        if (window._appReady && typeof window.showPage === 'function') {
-          const activePage = document.querySelector('.nav-item.active');
-          const pageId = activePage?.dataset?.page;
-          if (pageId) {
-            try { window.showPage(pageId); } catch(e) {}
-          }
+        // Refrescar la vista activa para mostrar los nuevos datos
+        if (changed && window._appBooted) {
+          try {
+            var activeNav = document.querySelector('.nav-item.active');
+            var pid = activeNav && activeNav.dataset && activeNav.dataset.page;
+            if (pid && typeof showPage === 'function') showPage(pid);
+          } catch(ex) {}
         }
-        console.log('[Firebase] Cambio en tiempo real recibido ✅');
-      }, e => console.warn('[FB] onSnapshot error:', e.message));
+        if (changed) console.log('[Firebase] Tiempo real: datos actualizados ✅');
+      }, function(e){ console.warn('[FB] onSnapshot:', e.message); });
 
-      // ── 3. Arrancar la app ───────────────────────────────────────
-      window._appReady = false;
-      const ov = document.getElementById('fb-overlay');
-      if (ov) { ov.style.opacity = '0'; setTimeout(() => ov.remove(), 500); }
-      console.log('[WorkerGoal] Firebase listo — arrancando app ✅');
+      // ── Todo listo: desbloquear cfgBoot ──
+      window._cfgBootPending = false;
+      window._appBooted = false;
 
-      // Marcar app lista después de un momento
-      setTimeout(() => { window._appReady = true; }, 2000);
+      // Ocultar overlay de carga
+      var ov = document.getElementById('fb-overlay');
+      if (ov) { ov.style.transition='opacity .4s'; ov.style.opacity='0'; setTimeout(function(){ ov.remove(); }, 450); }
+
+      // Llamar cfgBoot si ya estaba esperando
+      if (typeof window._runCfgBoot === 'function') {
+        window._runCfgBoot();
+      }
+      console.log('[WorkerGoal] Firebase listo ✅');
     </script>
 
-    <!-- Fallback: si Firebase no carga en 10s, arrancar igual -->
+    <!-- Fallback: si Firebase no carga en 8 segundos, arrancar igual -->
     <script>
-      setTimeout(() => {
-        const ov = document.getElementById('fb-overlay');
-        if (ov) { ov.style.opacity = '0'; setTimeout(() => ov.remove(), 500); }
-        // Si _LS no está disponible, usar localStorage real como fallback
-        if (!window._LS) {
-          console.warn('[WorkerGoal] Firebase no disponible — modo local');
-        }
-      }, 10000);
+      setTimeout(function() {
+        var ov = document.getElementById('fb-overlay');
+        if (ov) { ov.style.opacity='0'; setTimeout(function(){ ov.remove(); },400); }
+        window._cfgBootPending = false;
+        if (typeof window._runCfgBoot === 'function') window._runCfgBoot();
+        console.warn('[WorkerGoal] Firebase timeout — arrancando sin conexión');
+      }, 8000);
     </script>
 </head>
 
@@ -16330,7 +16374,10 @@ ${de ? `<div class="campo"><b>De:</b> ${mEsc(de)}</div>` : ''}
         let cfgEditUserId = null;
 
         /* ── boot: apply saved settings on page load ── */
-        (function cfgBoot() {
+        // Si Firebase aún está cargando, esperar antes de correr cfgBoot
+        function _doCfgBoot() {
+          window._appBooted = true;
+          (function cfgBoot() {
             const c = cfgLoad();
             // Business name
             if (c.bizName) { document.querySelector('.logo-text').textContent = c.bizName; }
@@ -16342,10 +16389,8 @@ ${de ? `<div class="campo"><b>De:</b> ${mEsc(de)}</div>` : ''}
             // Font size
             if (c.fontSize) { document.documentElement.style.fontSize = c.fontSize + 'px'; }
             // Require login on every open
-            // Seed admin SOLO si Firebase no tiene usuarios (bandera restpro_admin_seed_done_v1)
-            const SEED_KEY = 'restpro_admin_seed_done_v1';
-            function seedAdminOnce() {
-                if (localStorage.getItem(SEED_KEY) === '1') return;
+            // Seed admin SOLO la primera vez (la bandera queda en Firebase)
+            if (localStorage.getItem('restpro_admin_seed_v1') !== '1') {
                 const users = cfgLoadUsers();
                 if (users.length === 0) {
                     const master = {
@@ -16355,16 +16400,25 @@ ${de ? `<div class="campo"><b>De:</b> ${mEsc(de)}</div>` : ''}
                     };
                     cfgSaveUsers([master]);
                 }
-                localStorage.setItem(SEED_KEY, '1');
+                localStorage.setItem('restpro_admin_seed_v1', '1');
             }
-            seedAdminOnce();
             cfgCurrentUser = null;
             document.body.classList.add('app-locked');
             setTimeout(cfgShowLogin, 120);
             // Start food service check globally
             setTimeout(cfgCheckFoodService, 2000);
             setInterval(cfgCheckFoodService, 60000);
-        })();
+          })();
+        } // end _doCfgBoot
+
+        // Ejecutar cfgBoot: esperar a Firebase o correr inmediatamente
+        if (window._cfgBootPending) {
+          // Firebase aún cargando — encolar para cuando esté listo
+          window._runCfgBoot = _doCfgBoot;
+        } else {
+          // Firebase ya listo (o timeout) — correr ahora
+          _doCfgBoot();
+        }
 
         function cfgApplyUserToUI() {
             if (!cfgCurrentUser) return;
