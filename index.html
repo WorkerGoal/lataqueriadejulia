@@ -16303,15 +16303,25 @@ ${de ? `<div class="campo"><b>De:</b> ${mEsc(de)}</div>` : ''}
             // Font size
             if (c.fontSize) { document.documentElement.style.fontSize = c.fontSize + 'px'; }
             // Require login on every open
-            const users = cfgLoadUsers();
-            if (users.length === 0) {
-                const master = {
-                    id: 'usr_master', name: 'Administrador', login: 'admin', pass: '1234',
-                    cargo: 'Master', role: 'master', status: 'active',
-                    modules: ALL_MODULES.map(m => m.id), createdAt: Date.now()
-                };
-                cfgSaveUsers([master]);
+            // Seed admin user — runs immediately and again after Firebase loads
+            function seedAdminIfEmpty() {
+                const users = cfgLoadUsers();
+                if (users.length === 0) {
+                    const master = {
+                        id: 'usr_master', name: 'Administrador', login: 'admin', pass: '1234',
+                        cargo: 'Master', role: 'master', status: 'active',
+                        modules: ALL_MODULES.map(m => m.id), createdAt: Date.now()
+                    };
+                    cfgSaveUsers([master]);
+                }
             }
+            seedAdminIfEmpty();
+            // Also seed after Firebase finishes loading (in case Firestore was empty)
+            const _origFbReady = window._wgFirebaseReady;
+            window._wgFirebaseReady = function() {
+                if (typeof _origFbReady === 'function') _origFbReady();
+                setTimeout(seedAdminIfEmpty, 500);
+            };
             cfgCurrentUser = null;
             document.body.classList.add('app-locked');
             setTimeout(cfgShowLogin, 120);
