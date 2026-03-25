@@ -4334,15 +4334,31 @@
         }
     </style>
     <!-- PDF.js loads on demand -->
+
     <!-- ═══════════════════════════════════════════════════════════════
-         FIREBASE ONLINE STORAGE — WorkerGoal Multi-user
-         Reemplaza localStorage con Firestore en tiempo real
-         ═════════════════════════════════════════════════════════════== -->
+         FIREBASE REAL-TIME — WorkerGoal Multi-user
+         Lee y escribe DIRECTO a Firestore. onSnapshot para tiempo real.
+         ═════════════════════════════════════════════════════════════ -->
+
+    <!-- Pantalla de carga mientras Firebase conecta -->
+    <style>
+      #fb-overlay{position:fixed;inset:0;z-index:99999;background:#0a0e14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity .5s}
+      #fb-overlay .sp{width:48px;height:48px;border:4px solid #1e2d3d;border-top-color:#f97316;border-radius:50%;animation:sp .8s linear infinite}
+      @keyframes sp{to{transform:rotate(360deg)}}
+      #fb-overlay .tt{font-family:sans-serif;font-size:28px;color:#f97316;letter-spacing:2px;font-weight:900}
+      #fb-overlay .msg{font-family:sans-serif;color:#64748b;font-size:13px;text-align:center}
+    </style>
+    <div id="fb-overlay">
+      <div class="tt">WORKERGOAL</div>
+      <div class="sp"></div>
+      <div class="msg">Conectando con Firebase…</div>
+    </div>
+
     <script type="module">
-      // ── CONFIGURA TU FIREBASE AQUÍ ────────────────────────────────
-      // 1. Ve a https://console.firebase.google.com
-      // 2. Crea un proyecto → Firestore Database → Start in test mode
-      // 3. Configuración del proyecto → Agrega app web → Copia la config
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { getFirestore, doc, setDoc, deleteDoc, getDoc, collection, getDocs, onSnapshot }
+        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
       const firebaseConfig = {
         apiKey: "AIzaSyAO4QPSHWbgqvN3Dlu7FkRnE_iYV8ejgQQ",
         authDomain: "workergoal-cd580.firebaseapp.com",
@@ -4351,79 +4367,102 @@
         messagingSenderId: "646925301456",
         appId: "1:646925301456:web:7ee8682a679fe92c7850d5"
       };
-      // ──────────────────────────────────────────────────────────────
-
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-      import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs }
-        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
       const app = initializeApp(firebaseConfig);
       const db  = getFirestore(app);
-      const COL = "workergoal_data";   // colección en Firestore
+      const COL = "workergoal_data";
 
-      // ── Cache en memoria para lectura síncrona ──────────────────
-      const memCache = {};
-      let   syncReady = false;
+      // ── Cache local — la app lee de aquí síncronamente ──────────
+      const cache = {};
 
-      // Pre-carga todos los documentos al iniciar
-      async function preloadAll() {
-        try {
-          const snap = await getDocs(collection(db, COL));
-          snap.forEach(d => { memCache[d.id] = d.data().v ?? null; });
-          syncReady = true;
-          console.log('[Firebase] Datos precargados:', Object.keys(memCache).length, 'claves');
-        } catch(e) {
-          console.warn('[Firebase] Sin conexión, usando modo offline:', e.message);
-          syncReady = true;
-        }
-        // Arrancar la app cuando Firebase esté listo
-        if (typeof window._wgFirebaseReady === 'function') window._wgFirebaseReady();
-      }
-
-      // ── API pública expuesta como window.FB ─────────────────────
-      window.FB = {
-        getItem(key) {
-          return memCache[key] ?? null;
+      // ── API global que reemplaza localStorage ───────────────────
+      window._LS = {
+        getItem(k)    { return cache[k] ?? null; },
+        setItem(k, v) {
+          cache[k] = v;
+          setDoc(doc(db, COL, k), { v, updatedAt: Date.now() })
+            .catch(e => console.warn('[FB] write:', k, e.message));
         },
-        setItem(key, value) {
-          memCache[key] = value;
-          // Guardar en Firestore en segundo plano
-          setDoc(doc(db, COL, key), { v: value, updatedAt: Date.now() })
-            .catch(e => console.warn('[Firebase] setItem error:', key, e.message));
-          // También en localStorage como respaldo offline
-          try { localStorage.setItem(key, value); } catch(e) {}
+        removeItem(k) {
+          delete cache[k];
+          deleteDoc(doc(db, COL, k))
+            .catch(e => console.warn('[FB] delete:', k, e.message));
         },
-        removeItem(key) {
-          delete memCache[key];
-          deleteDoc(doc(db, COL, key))
-            .catch(e => console.warn('[Firebase] removeItem error:', key, e.message));
-          try { localStorage.removeItem(key); } catch(e) {}
-        },
-        // Para cfgRenderDataStats — simula Object.keys(localStorage)
-        get length() { return Object.keys(memCache).length; },
-        key(i) { return Object.keys(memCache)[i] ?? null; }
+        get length() { return Object.keys(cache).length; },
+        key(i)       { return Object.keys(cache)[i] ?? null; },
+        clear()      { Object.keys(cache).forEach(k => window._LS.removeItem(k)); }
       };
 
-      preloadAll();
-    </script>
-
-    <!-- Interceptor: reemplaza localStorage con window.FB una vez disponible -->
-    <script>
-      // Mientras Firebase carga, usamos localStorage como fallback síncróno
-      // Cuando esté listo, FB ya tiene los datos de Firestore en cache
-      (function() {
-        // Proxy que redirige localStorage → FB cuando esté disponible
-        const _origLS = window.localStorage;
+      // ── Reemplazar localStorage globalmente ──────────────────────
+      // Usamos Object.defineProperty para interceptar ANTES que cualquier script
+      try {
         Object.defineProperty(window, 'localStorage', {
-          get() {
-            return window.FB || _origLS;
-          },
+          get() { return window._LS; },
           configurable: true
         });
-        console.log('[WorkerGoal] Adaptador Firebase activo');
-      })();
+      } catch(e) {
+        // Fallback: parchear Storage.prototype
+        const _origGet = Storage.prototype.getItem;
+        const _origSet = Storage.prototype.setItem;
+        const _origDel = Storage.prototype.removeItem;
+        Storage.prototype.getItem    = function(k)    { return window._LS.getItem(k); };
+        Storage.prototype.setItem    = function(k, v) { window._LS.setItem(k, v); };
+        Storage.prototype.removeItem = function(k)    { window._LS.removeItem(k); };
+      }
+
+      // ── 1. Carga inicial — bajar TODOS los datos de Firebase ────
+      try {
+        const snap = await getDocs(collection(db, COL));
+        snap.forEach(d => { cache[d.id] = d.data().v ?? null; });
+        console.log('[Firebase] Carga inicial:', snap.size, 'claves ✅');
+      } catch(e) {
+        console.warn('[Firebase] Sin conexión — app en modo local:', e.message);
+      }
+
+      // ── 2. Listener en tiempo real — actualiza cache al instante ─
+      // Cuando otro usuario guarda algo, esta función recibe el cambio
+      // y actualiza el cache + refresca la vista activa de la app
+      onSnapshot(collection(db, COL), (snap) => {
+        snap.docChanges().forEach(change => {
+          const key = change.doc.id;
+          if (change.type === 'removed') {
+            delete cache[key];
+          } else {
+            cache[key] = change.doc.data().v ?? null;
+          }
+        });
+        // Refrescar la página activa si la app ya arrancó
+        if (window._appReady && typeof window.showPage === 'function') {
+          const activePage = document.querySelector('.nav-item.active');
+          const pageId = activePage?.dataset?.page;
+          if (pageId) {
+            try { window.showPage(pageId); } catch(e) {}
+          }
+        }
+        console.log('[Firebase] Cambio en tiempo real recibido ✅');
+      }, e => console.warn('[FB] onSnapshot error:', e.message));
+
+      // ── 3. Arrancar la app ───────────────────────────────────────
+      window._appReady = false;
+      const ov = document.getElementById('fb-overlay');
+      if (ov) { ov.style.opacity = '0'; setTimeout(() => ov.remove(), 500); }
+      console.log('[WorkerGoal] Firebase listo — arrancando app ✅');
+
+      // Marcar app lista después de un momento
+      setTimeout(() => { window._appReady = true; }, 2000);
     </script>
 
+    <!-- Fallback: si Firebase no carga en 10s, arrancar igual -->
+    <script>
+      setTimeout(() => {
+        const ov = document.getElementById('fb-overlay');
+        if (ov) { ov.style.opacity = '0'; setTimeout(() => ov.remove(), 500); }
+        // Si _LS no está disponible, usar localStorage real como fallback
+        if (!window._LS) {
+          console.warn('[WorkerGoal] Firebase no disponible — modo local');
+        }
+      }, 10000);
+    </script>
 </head>
 
 <body class="app-locked">
@@ -16303,11 +16342,10 @@ ${de ? `<div class="campo"><b>De:</b> ${mEsc(de)}</div>` : ''}
             // Font size
             if (c.fontSize) { document.documentElement.style.fontSize = c.fontSize + 'px'; }
             // Require login on every open
-            // Seed admin SOLO la primera vez (usa una clave en Firebase/localStorage para no repetir)
-            const SEED_DONE_KEY = 'restpro_admin_seed_done_v1';
+            // Seed admin SOLO si Firebase no tiene usuarios (bandera restpro_admin_seed_done_v1)
+            const SEED_KEY = 'restpro_admin_seed_done_v1';
             function seedAdminOnce() {
-                const alreadySeeded = localStorage.getItem(SEED_DONE_KEY) === '1';
-                if (alreadySeeded) return;
+                if (localStorage.getItem(SEED_KEY) === '1') return;
                 const users = cfgLoadUsers();
                 if (users.length === 0) {
                     const master = {
@@ -16317,16 +16355,9 @@ ${de ? `<div class="campo"><b>De:</b> ${mEsc(de)}</div>` : ''}
                     };
                     cfgSaveUsers([master]);
                 }
-                // Marcar como hecho — no volver a ejecutar nunca más
-                localStorage.setItem(SEED_DONE_KEY, '1');
+                localStorage.setItem(SEED_KEY, '1');
             }
             seedAdminOnce();
-            // También correr después de que Firebase cargue (por si llegó tarde)
-            const _origFbReady = window._wgFirebaseReady;
-            window._wgFirebaseReady = function() {
-                if (typeof _origFbReady === 'function') _origFbReady();
-                setTimeout(seedAdminOnce, 500);
-            };
             cfgCurrentUser = null;
             document.body.classList.add('app-locked');
             setTimeout(cfgShowLogin, 120);
