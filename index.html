@@ -260,6 +260,33 @@
             gap: 16px;
         }
 
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .mobile-only {
+            display: none !important;
+        }
+
+        .mobile-menu-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 7, 18, .66);
+            backdrop-filter: blur(4px);
+            z-index: 95;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .22s ease;
+        }
+
+        body.menu-open .mobile-menu-overlay {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
         .topbar-date {
             font-size: 12px;
             color: var(--muted);
@@ -295,6 +322,47 @@
         .btn-outline:hover {
             border-color: var(--accent);
             color: var(--accent);
+        }
+
+        .responsive-ui-btn {
+            background: #111827 !important;
+            color: #ffffff !important;
+            border-color: #334155 !important;
+        }
+
+        .responsive-ui-btn:hover,
+        .responsive-ui-btn:focus,
+        .responsive-ui-btn:active {
+            background: #0f172a !important;
+            color: #ffffff !important;
+            border-color: var(--accent) !important;
+        }
+
+        /* Topbar: texto y botones siempre en blanco, también en modo claro */
+        .topbar .page-title,
+        .topbar .topbar-date,
+        .topbar .btn,
+        .topbar .btn-outline,
+        .topbar .btn-primary {
+            color: #ffffff !important;
+        }
+
+        .topbar .btn-outline {
+            background: rgba(15, 23, 42, 0.92) !important;
+            border-color: #334155 !important;
+        }
+
+        .topbar .btn-outline:hover,
+        .topbar .btn-outline:focus,
+        .topbar .btn-outline:active,
+        .topbar .btn-primary:hover,
+        .topbar .btn-primary:focus,
+        .topbar .btn-primary:active {
+            color: #ffffff !important;
+        }
+
+        .topbar .topbar-date {
+            opacity: 0.95;
         }
 
         .btn-success {
@@ -874,6 +942,250 @@
             cursor: pointer;
             color: var(--muted);
             font-size: 20px;
+        }
+
+
+        /* MOBILE / VISTA CELULAR */
+        body.force-mobile {
+            background: #05080f;
+        }
+
+        body.force-mobile .main {
+            margin-left: 0 !important;
+            width: 100%;
+            max-width: 430px;
+            min-height: 100vh;
+            margin: 0 auto !important;
+            background: var(--bg);
+            border-left: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+            box-shadow: 0 0 0 1px rgba(255,255,255,.02), 0 18px 60px rgba(0,0,0,.4);
+        }
+
+        body.force-mobile .sidebar {
+            width: min(84vw, 320px);
+            transform: translateX(-100%);
+            transition: transform .24s ease;
+            box-shadow: 18px 0 40px rgba(0, 0, 0, .38);
+        }
+
+        body.force-mobile.menu-open .sidebar {
+            transform: translateX(0);
+        }
+
+        body.force-mobile .mobile-only {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body.force-mobile .desktop-mobile-preview-toggle {
+            display: inline-flex !important;
+        }
+
+        body.force-mobile .topbar {
+            padding: 12px 14px;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        body.force-mobile .topbar-left,
+        body.force-mobile .topbar-right {
+            width: 100%;
+        }
+
+        body.force-mobile .topbar-right {
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        body.force-mobile .topbar-right .btn {
+            flex: 1 1 calc(50% - 4px);
+        }
+
+        body.force-mobile .page-title {
+            font-size: 22px;
+            line-height: 1;
+            min-width: 0;
+        }
+
+        body.force-mobile .content {
+            padding: 14px;
+        }
+
+        body.force-mobile .kpi-grid,
+        body.force-mobile .grid-2,
+        body.force-mobile .grid-3,
+        body.force-mobile .form-grid,
+        body.force-mobile .inv-summary-grid,
+        body.force-mobile .insteq-grid-2,
+        body.force-mobile .insteq-grid-4,
+        body.force-mobile .perm-cap-grid,
+        body.force-mobile #page-salud_personal .sp-grid-top,
+        body.force-mobile #page-salud_personal .sp-grid-bottom,
+        body.force-mobile #page-bpm .bpm-panel-grid,
+        body.force-mobile #page-rotulado .rot-grid {
+            grid-template-columns: 1fr !important;
+            height: auto !important;
+        }
+
+        body.force-mobile .card-header,
+        body.force-mobile .cfg-row,
+        body.force-mobile .doc-history-item,
+        body.force-mobile .memo-hist-card,
+        body.force-mobile .usr-row,
+        body.force-mobile .user-card {
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        body.force-mobile .tabs,
+        body.force-mobile .cfg-tabs {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+        }
+
+        body.force-mobile .tab,
+        body.force-mobile .cfg-tab {
+            white-space: nowrap;
+        }
+
+        body.force-mobile .full-card,
+        body.force-mobile .modal,
+        body.force-mobile .doc-viewer-box {
+            max-width: 100%;
+        }
+
+        body.force-mobile .full-card,
+        body.force-mobile .table-wrap {
+            overflow-x: auto;
+        }
+
+        body.force-mobile table {
+            min-width: 680px;
+        }
+
+        body.force-mobile .sidebar-footer {
+            padding-bottom: 24px;
+        }
+
+        @media (max-width:900px) {
+            .mobile-only {
+                display: inline-flex !important;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .desktop-mobile-preview-toggle {
+                display: none !important;
+            }
+
+            .mobile-menu-overlay {
+                display: block;
+            }
+
+            .sidebar {
+                width: min(84vw, 320px);
+                transform: translateX(-100%);
+                transition: transform .24s ease;
+                box-shadow: 18px 0 40px rgba(0, 0, 0, .38);
+            }
+
+            body.menu-open .sidebar {
+                transform: translateX(0);
+            }
+
+            .main {
+                margin-left: 0;
+            }
+
+            .topbar {
+                padding: 12px 14px;
+                gap: 10px;
+                flex-wrap: wrap;
+                align-items: flex-start;
+            }
+
+            .topbar-left,
+            .topbar-right {
+                width: 100%;
+            }
+
+            .topbar-right {
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: space-between;
+            }
+
+            .topbar-right .btn {
+                flex: 1 1 calc(50% - 4px);
+            }
+
+            .page-title {
+                font-size: 22px;
+                line-height: 1;
+                min-width: 0;
+            }
+
+            .content {
+                padding: 14px;
+            }
+
+            .kpi-grid,
+            .grid-2,
+            .grid-3,
+            .form-grid,
+            .inv-summary-grid,
+            .insteq-grid-2,
+            .insteq-grid-4,
+            .perm-cap-grid,
+            #page-salud_personal .sp-grid-top,
+            #page-salud_personal .sp-grid-bottom,
+            #page-bpm .bpm-panel-grid,
+            #page-rotulado .rot-grid {
+                grid-template-columns: 1fr !important;
+                height: auto !important;
+            }
+
+            .card-header,
+            .cfg-row,
+            .doc-history-item,
+            .memo-hist-card,
+            .usr-row,
+            .user-card {
+                flex-wrap: wrap;
+                align-items: flex-start;
+            }
+
+            .tabs,
+            .cfg-tabs {
+                width: 100%;
+                overflow-x: auto;
+                overflow-y: hidden;
+                scrollbar-width: thin;
+            }
+
+            .tab,
+            .cfg-tab {
+                white-space: nowrap;
+            }
+
+            .full-card,
+            .table-wrap {
+                overflow-x: auto;
+            }
+
+            table {
+                min-width: 680px;
+            }
+
+            .sidebar-footer {
+                padding-bottom: 24px;
+            }
         }
 
         /* PRINT */
@@ -4260,16 +4572,20 @@
         </div>
     </div>
 
+    <div class="mobile-menu-overlay" id="mobileMenuOverlay" onclick="closeMobileMenu()"></div>
+
     <!-- MAIN -->
     <div class="main">
         <div class="topbar">
-            <div class="page-title" id="pageTitle">DASHBOARD GENERAL</div>
+            <div class="topbar-left">
+                <button class="btn btn-outline btn-sm mobile-only responsive-ui-btn" type="button" onclick="toggleMobileMenu()">☰ Menú</button>
+                <div class="page-title" id="pageTitle">DASHBOARD GENERAL</div>
+            </div>
             <div class="topbar-right">
                 <div class="topbar-date" id="currentDate"></div>
-                <button class="btn btn-outline btn-sm" onclick="window.print()"
-                    class="btn btn-outline btn-sm perm-export-btn">🖨️ Imprimir</button>
-                <button class="btn btn-primary btn-sm" onclick="exportReport()"
-                    class="btn btn-primary btn-sm perm-export-btn">⬇️ Exportar</button>
+                <button class="btn btn-outline btn-sm desktop-mobile-preview-toggle responsive-ui-btn" id="mobilePreviewBtn" type="button" onclick="toggleMobilePreview()">📱 Ver celular</button>
+                <button class="btn btn-outline btn-sm perm-export-btn" type="button" onclick="window.print()">🖨️ Imprimir</button>
+                <button class="btn btn-primary btn-sm perm-export-btn" type="button" onclick="exportReport()">⬇️ Exportar</button>
             </div>
         </div>
 
@@ -9456,6 +9772,7 @@
             document.querySelectorAll('.nav-item').forEach(n => {
                 if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + id + "'")) n.classList.add('active');
             });
+            if (typeof closeMobileMenu === 'function') closeMobileMenu();
 
             // failsafe: BPM solo debe verse en su módulo
             const bpmPg = document.getElementById('page-bpm');
@@ -24016,6 +24333,52 @@ ${rows}
             capRefreshStatus();
             capRenderExam();
         };
+
+        function syncMobilePreviewButton() {
+            const btn = document.getElementById('mobilePreviewBtn');
+            if (!btn) return;
+            const mobileMode = document.body.classList.contains('force-mobile');
+            btn.textContent = mobileMode ? '💻 Vista escritorio' : '📱 Ver celular';
+            btn.classList.toggle('btn-primary', mobileMode);
+            btn.classList.toggle('btn-outline', !mobileMode);
+        }
+
+        function closeMobileMenu() {
+            document.body.classList.remove('menu-open');
+        }
+
+        function toggleMobileMenu(forceState) {
+            const shouldOpen = (typeof forceState === 'boolean')
+                ? forceState
+                : !document.body.classList.contains('menu-open');
+            document.body.classList.toggle('menu-open', shouldOpen);
+        }
+
+        function toggleMobilePreview() {
+            document.body.classList.toggle('force-mobile');
+            if (!document.body.classList.contains('force-mobile')) closeMobileMenu();
+            try {
+                localStorage.setItem('wg_force_mobile_preview', document.body.classList.contains('force-mobile') ? '1' : '0');
+            } catch (e) { }
+            syncMobilePreviewButton();
+        }
+
+        (function initResponsiveAppUI() {
+            try {
+                if (localStorage.getItem('wg_force_mobile_preview') === '1') {
+                    document.body.classList.add('force-mobile');
+                }
+            } catch (e) { }
+            syncMobilePreviewButton();
+            window.addEventListener('resize', () => {
+                if (window.innerWidth > 900 && !document.body.classList.contains('force-mobile')) {
+                    closeMobileMenu();
+                }
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeMobileMenu();
+            });
+        })();
 
     </script>
 </body>
